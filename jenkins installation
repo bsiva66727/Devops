@@ -19,3 +19,9 @@ sudo systemctl enable jenkins
 sudo systemctl start jenkins
 sudo systemctl status jenkins
 cat /var/lib/jenkins/secrets/initialAdminPassword
+
+jenkins homepath : /var/lib/jenkins/
+
+maven homepath : /usr/share/maven/
+
+java homepath : /usr/lib/jvm/java-21-openjdk-amd64
