@@ -1,3 +1,7 @@
+jenkins default port : 8080
+
+######## Installation steps for jenkins#######
+
 apt-get update
 apt-get install git wget nano curl tree vim
 apt-get install default-jdk -y
