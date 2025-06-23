@@ -42,5 +42,5 @@ Now Start Nexus
      sudo systemctl start nexus
      sudo systemctl status nexus
 
-Install plugin Pipeline Utility Steps (
+##### install Nexus Artifact Uploader and Pipeline Utility Steps#######
 tail -f /opt/sonatype-work/nexus3/log/nexus.log
