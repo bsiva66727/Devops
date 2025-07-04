@@ -1,0 +1,126 @@
+GCR configurations :
+---------------------
+https://cloud.google.com/container-registry/docs/advanced-authentication
+root@master:~# history
+  1  vi /etc/sudoers
+     ####add below line in vi /etc/sudoers at below line of root#####
+     jenkins ALL=(ALL) NOPASSWD: ALL    
+  2  sudo chown -R jenkins:jenkins /var/lib/jenkins
+  3  sudo chmod 666 /var/run/docker.sock
+  4  sudo usermod -a -G docker jenkins
+  5  sudo usermod -a -G docker ubuntu
+  6  sudo su - jenkins
+  7  gcloud auth login
+  8  vi cred.json
+     #####add key in vi cred.json created in service account in gcr####
+  9  gcloud auth activate-service-account devops@strategic-altar-463506-c4.iam.gserviceaccount.com --key-file=cred.json
+  10  gcloud auth configure-docker
+
+
+
+
+####CHANGE PIPELINE WITH REQUIRED DATA######
+
+
+pipeline {
+  agent any
+
+  tools {
+    jdk 'Java'
+    maven 'Maven'
+  }
+  
+  environment {
+      NEXUS_VERSION = "nexus3"
+      NEXUS_PROTOCOL = "http"
+      NEXUS_URL = "10.128.0.10:8081"
+      NEXUS_REPOSITORY = "practice"
+      NEXUS_CREDENTIAL_ID = "nexus-cred"
+      NEXUS_RELEASE = "2.0.0"
+
+
+ }
+ parameters {
+      string(defaultValue: 'main', description: 'Please type any branch name to deploy', name: 'Branch')
+ }  
+
+stages {
+    stage('Git checkout'){
+      steps {
+        git branch: '${Branch}',
+        url: 'https://github.com/bsiva66727/my-java-project.git'
+      }
+    }
+    stage('Maven build'){
+      steps {
+        sh '''
+        ls 
+        pwd
+        mvn clean install
+        '''
+      }
+    }
+   stage ('Sonarqube Analysis'){
+           steps {
+           withSonarQubeEnv('Sonarqube') {
+           sh '''
+           mvn -e -B sonar:sonar -Dsonar.java.source=1.8  -Dsonar.sourceEncoding=UTF-8
+           '''
+           }
+         }
+      }
+    stage("Publish to Nexus Repository Manager") {
+            steps {
+                script {
+                    pom = readMavenPom file: "pom.xml";
+                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
+                    echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
+                    artifactPath = filesByGlob[0].path;
+                    artifactExists = fileExists artifactPath;
+                    if(artifactExists) {
+                        echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version ${pom.version}";
+                        nexusArtifactUploader(
+                            nexusVersion: NEXUS_VERSION,
+                            protocol: NEXUS_PROTOCOL,
+                            nexusUrl: NEXUS_URL,
+                            groupId: pom.groupId,
+                            version: NEXUS_RELEASE,
+                            repository: NEXUS_REPOSITORY,
+                            credentialsId: NEXUS_CREDENTIAL_ID,
+                            artifacts: [
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: artifactPath,
+                                type: pom.packaging],
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: "pom.xml",
+                                type: "pom"]
+                            ]
+                        );
+                    } else {
+                        error "*** File: ${artifactPath}, could not be found";
+                    }
+                }
+            }
+        }
+
+      
+      stage ('Build Docker Image'){
+        steps {
+          sh '''
+          cd ${WORKSPACE}
+          docker build -t gcr.io/strategic-altar-463506-c4/my-java-project --file=Dockerfile ${WORKSPACE}
+          '''
+        }
+      }
+      stage ('Publish Docker Image'){
+        steps {
+          sh '''
+          docker push gcr.io/strategic-altar-463506-c4/my-java-project
+          '''
+        }
+      }
+  
+ }
+}
